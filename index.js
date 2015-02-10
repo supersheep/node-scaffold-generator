@@ -65,7 +65,6 @@ function Scaffold(options, callback) {
   this.options = options;
 };
 
-
 Scaffold.prototype.copy = function(from, to, callback) {
   if (Object(from) === from) {
     var file_map = from;
@@ -76,10 +75,20 @@ Scaffold.prototype.copy = function(from, to, callback) {
   return this._copy(from, to, callback);
 };
 
+Scaffold.prototype._getEncoding = function(path){
+  var binary = this.options.binary || ".jpg,.png,.gif,.bmp,.swf,.pdf";
+  binary = binary ? binary.split(",") : [];
+  if(binary.indexOf(node_path.extname(path)) == -1){
+    return "utf8";
+  }else{
+    return "binary";
+  }
+}
 
 Scaffold.prototype.write = function(to, template, callback) {
   var renderer = this.options.renderer;
   var data = this.options.data;
+  var self = this;
   to = renderer.render(to, data);
   this._shouldOverride(to, this.options.override, function (override) {
     if (!override) {
@@ -87,7 +96,9 @@ Scaffold.prototype.write = function(to, template, callback) {
     }
 
     var content = renderer.render(template, data);
-    fse.outputFile(to, content, callback);
+    fse.outputFile(to, content, {
+      encoding: self._getEncoding(to)
+    }, callback);
   });
 };
 
@@ -130,7 +141,7 @@ Scaffold.prototype._copyDir = function(from, to, callback) {
       var file_to = node_path.join(to, file);
       map[file_from] = file_to;
     });
-    
+
     self._copyFiles(map, callback);
   });
 };
@@ -189,7 +200,9 @@ Scaffold.prototype._copyFile = function (from, to, callback) {
         return callback(err);
       }
 
-      fse.outputFile(to, content, callback);
+      fse.outputFile(to, content, {
+        encoding: self._getEncoding(to)
+      }, callback);
     });
   });
 };
@@ -210,7 +223,7 @@ Scaffold.prototype._shouldOverride = function (file, override, callback) {
         } else {
           return callback(true);
         }
-        
+
       } else {
         return callback(false);
       }
@@ -224,12 +237,16 @@ Scaffold.prototype._shouldOverride = function (file, override, callback) {
 // Reads file and substitute with the data
 Scaffold.prototype._readAndTemplate = function (path, data, callback) {
   var renderer = this.options.renderer;
+  var self = this;
   fs.readFile(path, function (err, content) {
     if (err) {
       return callback(err);
     }
 
-    content = renderer.render(content.toString(), data);
+    if (self._getEncoding(path) == "utf8"){
+      content = renderer.render(content.toString(), data);
+    }
+
     callback(null, content);
   });
 };
