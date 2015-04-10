@@ -1,5 +1,7 @@
 'use strict';
 
+var minimatch = require('minimatch');
+
 module.exports = scaffold;
 function scaffold (options) {
   options = scaffold.checkOptions(options);
@@ -42,6 +44,10 @@ scaffold.checkOptions = function (options) {
 
   if (typeof options.renderer.render !== 'function') {
     throw new Error('`options.renderer.render` is not a function');
+  }
+
+  if(!options.ignore || !Array.isArray(options.ignore)){
+    options.ignore = []
   }
 
   return options;
@@ -127,9 +133,25 @@ Scaffold.prototype._copy = function(from, to, callback) {
   });
 };
 
+Scaffold.prototype._shouldIgnore = function(filepath){
+  var ignore = this.options.ignore;
+  var shouldIgnore = false;
+  ignore.forEach(function(glob){
+    if(minimatch(filepath, glob, {
+      dot: true
+    })){
+      shouldIgnore = true;
+    }
+  });
+
+  return shouldIgnore;
+};
 
 Scaffold.prototype._copyDir = function(from, to, callback) {
   var self = this;
+  if(this._shouldIgnore(from)){
+    return callback(null);
+  }
   this._globDir(from, function (err, files) {
     if (err) {
       return callback(err);
@@ -187,6 +209,9 @@ Scaffold.prototype._copyFiles = function(file_map, callback) {
 Scaffold.prototype._copyFile = function (from, to, callback) {
   var data = this.options.data;
   var renderer = this.options.renderer;
+  if(this._shouldIgnore(from)){
+    return callback(null);
+  }
   // substitute file name
   to = renderer.render(to, data);
   var self = this;
